@@ -1,0 +1,28 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+# Nodes
+set client [$ns node]
+tb-set-node-os $client Ubuntu1004-STD
+set s1 [$ns node]
+tb-set-node-os $s1 Ubuntu1004-STD
+set s2 [$ns node]
+tb-set-node-os $s2 Ubuntu1004-STD
+set s3 [$ns node]
+tb-set-node-os $s3 Ubuntu1004-STD
+
+
+# Links
+# set cs1 [$ns duplex-link $client $s1 1000000.0kb 0.0ms DropTail]
+# set cs2 [$ns duplex-link $client $s2 1000000.0kb 0.0ms DropTail]
+# set cs3 [$ns duplex-link $client $s3 1000000.0kb 0.0ms DropTail]
+
+# set ss12 [$ns duplex-link $s1 $s2 1000000.0kb 0.0ms DropTail]
+# set ss13 [$ns duplex-link $s1 $s3 1000000.0kb 0.0ms DropTail]
+# set ss23 [$ns duplex-link $s2 $s3 1000000.0kb 0.0ms DropTail]
+
+# Lans
+set lan0 [$ns make-lan "$s1 $s2 $s3 $client" 1000000.0kb 0.0ms]
+
+$ns rtproto Static
+$ns run
