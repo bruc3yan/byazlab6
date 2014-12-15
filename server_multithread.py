@@ -9,6 +9,13 @@
 import threading
 import time
 import SocketServer
+try:
+    import cPickle as pickle
+except:
+    import pickle
+from integer import Integer
+
+
 #usage: python server.py
 
 class ClientRequestHandler(SocketServer.BaseRequestHandler):
@@ -18,7 +25,10 @@ class ClientRequestHandler(SocketServer.BaseRequestHandler):
         threading.current_thread().setName("Client listener")
         cur_thread_name = threading.current_thread().getName()
         print("{} hears (out of {}) from {} : ".format(cur_thread_name, threading.active_count(), self.client_address))
-        print(data)
+        data_by = pickle.loads(data) # de-serialize
+        print "Serialized data:    ", data
+        print "De-serialized data: ", data_by
+        # print(data_by) # print de-serailized data
         socket.sendto(data.upper(), self.client_address)
 
 
@@ -29,10 +39,13 @@ class ServerRequestHandler(SocketServer.BaseRequestHandler):
         threading.current_thread().setName("Server listener")
         cur_thread = threading.current_thread().getName()
         print("{} hears (out of {}) from server {} : ".format(cur_thread, threading.active_count(), self.client_address))
-        print(data)
+        data_by = pickle.loads(data) # de-serialize
+        print "Serialized data:    ", data
+        print "De-serialized data: ", data_by
+        # print(data_by) # print de-serailized data
         socket.sendto(data.upper(), self.client_address)
 
-class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer): 
+class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         pass
 
 if __name__ == "__main__":
@@ -53,7 +66,7 @@ if __name__ == "__main__":
 	    print threading.active_count()
 
 	    # port 8000 -> server messages comes here
-	    server_interface = ThreadedUDPServer((HOST,PORT), ServerRequestHandler) 
+	    server_interface = ThreadedUDPServer((HOST,PORT), ServerRequestHandler)
 	    server_listener = threading.Thread(target=server_interface.serve_forever)
 	    server_listener.setDaemon(True)
 	    print("Server listener at port", PORT)
