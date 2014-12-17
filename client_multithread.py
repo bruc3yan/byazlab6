@@ -36,7 +36,7 @@ data_by = pickle.dumps(data) # serialize
 client_socket.sendto(data_by, address)
 received = client_socket.recv(1024)
 
-
+print client_socket.getsockname()
 print "Sent:     {}".format(data)
 print "Received: {}".format(received)
 client_socket.close()

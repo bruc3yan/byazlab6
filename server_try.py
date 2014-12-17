@@ -11,11 +11,25 @@ import time
 import SocketServer
 import sys
 from integer import Integer
+import os
 #usage: python server.py (servername)
 
+os.system('clear')
+# Hard coded a list of servers & ports
 SERVERS = {}
 SERVERS["s1"] = ('localhost', 1000)
 SERVERS["s2"] = ('localhost', 2000)
+
+# Dict of integers
+DATA_LIBRARY = {} 
+
+COUNTER = Integer('meow')
+COUNTER.set(55)
+
+# Server name of this server
+THIS_SERVER = sys.argv[1]
+
+JOB_QUEUE = {}
 
 class ClientRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
@@ -28,7 +42,21 @@ class ClientRequestHandler(SocketServer.BaseRequestHandler):
         for server in SERVERS.keys():
             HOST, PORT = SERVERS[server][0], SERVERS[server][1]
             print 'HOST, PORT', (HOST, PORT)
-            socket.sendto(str(self.client_address), (HOST,PORT))
+            socket.sendto(data, (HOST,PORT))
+        # count = 2
+        # if self.client_address[1] == 1000 or self.client_address[1] == 2000:
+        #     print 'thread is joining.'
+        #     threading.current_thread().terminate()
+        #     threading.current_thread().join()
+        # while count:
+        #     ack = socket.recv(1024)
+        #     if 's1' in ack:
+        #         count = count -1
+        #     if 's2' in ack:
+        #         count = count -1
+        #     print 'ack from ', ack, '   count is ', count
+
+
         socket.sendto(data.upper(), self.client_address)
 
 
@@ -40,6 +68,22 @@ class ServerRequestHandler(SocketServer.BaseRequestHandler):
         cur_thread = threading.current_thread().getName()
         print("{} hears (out of {}) from server {} : ".format(cur_thread, threading.active_count(), self.client_address))
         print(data)
+        server_address = (self.client_address[0], self.client_address[1] -1)
+        print 'yoooo    ', server_address
+        boo = COUNTER.get()
+        COUNTER.set(boo-1)
+        print 'boo is ', boo
+        print 'The counter is ', COUNTER.get()
+        # count = 2
+        # while count:
+        #     ack = socket.recv(1024)
+        #     if 's1' in ack:
+        #         count = count -1
+        #     if 's2' in ack:
+        #         count = count -1
+        #     print 'ack receivedd from ', ack, '   count is ', count
+
+        socket.sendto('ack from ' + THIS_SERVER, server_address)
         # socket.sendto(data.upper(), self.client_address)
 
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer): 
@@ -51,7 +95,7 @@ if __name__ == "__main__":
 
     try:
         print SERVERS
-    	this_server = SERVERS[sys.argv[1]]
+    	this_server = SERVERS[THIS_SERVER]
     	HOST, PORT = this_server[0], this_server[1]
         print 'HOST, PORT', HOST, PORT
     except StandardError:
