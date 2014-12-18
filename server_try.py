@@ -27,7 +27,7 @@ SERVERS["s2"] = ('localhost', 2000)
 NUM_SERVERS = 2
 
 # Dict of integers
-DATA_LIBRARY = {} 
+DATA_LIBRARY = {}
 
 COUNTER = Integer('meow')
 COUNTER.set(0)
@@ -39,6 +39,9 @@ THIS_SERVER = sys.argv[1]
 # the key is the HOST,PORT of the client
 # then it gives back an array: [jobNumber, remaining waiting servers]
 JOB_QUEUE = {}
+
+# locks
+lock = threading.Lock()
 
 class ClientRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
@@ -87,6 +90,22 @@ class ClientRequestHandler(SocketServer.BaseRequestHandler):
 
         #socket.sendto(data.upper(), self.client_address)
 
+        # bruce's thingssss
+        # lock.acquire()
+        # try:
+        # 	print(data)
+        # finally:
+        # 	lock.release()
+        # for server in SERVERS.keys():
+        #     HOST, PORT = SERVERS[server][0], SERVERS[server][1]
+        #     print 'HOST, PORT', (HOST, PORT)
+        #     socket.sendto(data, (HOST,PORT))
+
+
+
+        # socket.sendto(data.upper(), self.client_address)
+
+
 
 class ServerRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
@@ -113,9 +132,24 @@ class ServerRequestHandler(SocketServer.BaseRequestHandler):
         response_pickle = pickle.dumps(response)
         socket.sendto(response_pickle, server_address)
         print 'Just sent response to ', server_address
+
+        # bruce's things
+        # lock.acquire()
+        # try:
+        # 	print(data)
+        # finally:
+        # 	lock.release()
+        # server_address = (self.client_address[0], self.client_address[1] -1)
+        # print 'yoooo    ', server_address
+        # boo = COUNTER.get()
+        # COUNTER.set(boo-1)
+        # print 'boo is ', boo
+        # print 'The counter is ', COUNTER.get()
+
+        # socket.sendto('ack from ' + THIS_SERVER, server_address)
         # socket.sendto(data.upper(), self.client_address)
 
-class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer): 
+class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         pass
 
 if __name__ == "__main__":
@@ -146,7 +180,7 @@ if __name__ == "__main__":
 	    print threading.active_count()
 
 	    # port 8000 -> server messages comes here
-	    server_interface = ThreadedUDPServer((HOST,PORT), ServerRequestHandler) 
+	    server_interface = ThreadedUDPServer((HOST,PORT), ServerRequestHandler)
 	    server_listener = threading.Thread(target=server_interface.serve_forever)
 	    server_listener.setDaemon(True)
 	    print("Server listener at port", PORT)
