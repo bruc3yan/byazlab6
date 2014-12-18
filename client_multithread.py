@@ -6,6 +6,9 @@
 import socket
 import sys
 import os
+import signal
+
+TIME_OUT = 5
 
 try:
     import cPickle as pickle
@@ -15,6 +18,9 @@ import pprint # for printing
 
 from integer import Integer
 
+# For handling time out
+def handler(signum, frame):
+	raise Exception("Failed to get a prompt response from server.")
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # client_socket.connect(("localhost", 5006))
 # Comment 1: We don't want the above line because unlike TCP, which needs to maintain a solid connection, we don't need to do that with UDP.  UDP is meant to be used as opening a connection and sending stuff over, then closing the connection when done.  Don't need to keep it open
@@ -34,10 +40,24 @@ buf = BLOCK_SIZE - INDEX_SIZE
 data = "Hello world!"
 data_by = pickle.dumps(data) # serialize
 client_socket.sendto(data_by, address)
-received = client_socket.recv(1024)
 
+# This is for setting up timeout
+signal.signal(signal.SIGALRM, handler)
+signal.alarm(TIME_OUT)
+
+# Try receive response from server
+try:
+	received = client_socket.recv(1024)
+except Exception, exc:
+	print exc
+	received = None
+
+# Print results
 print client_socket.getsockname()
 print "Sent:     {}".format(data)
-print "Received: {}".format(received)
+try:
+	print "Received: {}".format(pickle.loads(received))
+except AttributeError:
+	print "Received: {}".format(received)
 client_socket.close()
 

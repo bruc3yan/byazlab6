@@ -12,6 +12,11 @@ import SocketServer
 import sys
 from integer import Integer
 import os
+import signal
+try:
+    import cPickle as pickle
+except:
+    import pickle
 #usage: python server.py (servername)
 
 os.system('clear')
@@ -19,16 +24,20 @@ os.system('clear')
 SERVERS = {}
 SERVERS["s1"] = ('localhost', 1000)
 SERVERS["s2"] = ('localhost', 2000)
+NUM_SERVERS = 2
 
 # Dict of integers
 DATA_LIBRARY = {} 
 
 COUNTER = Integer('meow')
-COUNTER.set(55)
+COUNTER.set(0)
 
 # Server name of this server
 THIS_SERVER = sys.argv[1]
 
+# The waiting queue for this server
+# the key is the HOST,PORT of the client
+# then it gives back an array: [jobNumber, remaining waiting servers]
 JOB_QUEUE = {}
 
 class ClientRequestHandler(SocketServer.BaseRequestHandler):
@@ -37,53 +46,73 @@ class ClientRequestHandler(SocketServer.BaseRequestHandler):
         socket = self.request[1]
         threading.current_thread().setName("Client listener")
         cur_thread_name = threading.current_thread().getName()
+        data_by = pickle.loads(data) # de-serialize
+        # data_by = data
         print("{} hears (out of {}) from {} : ".format(cur_thread_name, threading.active_count(), self.client_address))
-        print(data)
-        for server in SERVERS.keys():
-            HOST, PORT = SERVERS[server][0], SERVERS[server][1]
-            print 'HOST, PORT', (HOST, PORT)
-            socket.sendto(data, (HOST,PORT))
-        # count = 2
-        # if self.client_address[1] == 1000 or self.client_address[1] == 2000:
-        #     print 'thread is joining.'
-        #     threading.current_thread().terminate()
-        #     threading.current_thread().join()
-        # while count:
-        #     ack = socket.recv(1024)
-        #     if 's1' in ack:
-        #         count = count -1
-        #     if 's2' in ack:
-        #         count = count -1
-        #     print 'ack from ', ack, '   count is ', count
+        print(data_by)
+
+        # if this is a ACK from the servers for previous requests
+        client_port = self.client_address[1]
+        if (client_port == 1000) or (client_port == 2000):
+            print "OOOOH ITS AN ALLYYY"
+            # getting # [SERVERname, (HOST,PORT), jobNumber]
+            try:
+                receivedServer = data_by[0]
+                receivedClient = data_by[1]
+                receivedJobnum = data_by[2]
+                print JOB_QUEUE
+                value = JOB_QUEUE[receivedClient]
+                value[1] = value[1] -1
+                if (value[1] == 0):
+                    socket.sendto(pickle.dumps('Success.'), receivedClient)
+            except StandardError:
+                print '...'
+
+        
+        # if this request comes from actual client
+        else:
+            # [CLIENT, INTEGER, CREATE, ARG0]
+            jobNumber = COUNTER.get()
+            COUNTER.set(jobNumber+1)
+            newJob = [THIS_SERVER, self.client_address, jobNumber, data_by]
+            newJob_pickled = pickle.dumps(newJob)
+            JOB_QUEUE[self.client_address] = [jobNumber, NUM_SERVERS]
+            print 'making new job : ', jobNumber
+            print 'increased counter to be :    ', COUNTER.get()
+            for server in SERVERS.keys():
+                HOST, PORT = SERVERS[server][0], SERVERS[server][1]
+                print 'HOST, PORT', (HOST, PORT)
+                socket.sendto(newJob_pickled, (HOST,PORT))
 
 
-        socket.sendto(data.upper(), self.client_address)
+        #socket.sendto(data.upper(), self.client_address)
 
 
 class ServerRequestHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         data = self.request[0].strip()
+        data_by = pickle.loads(data)
         socket = self.request[1]
         threading.current_thread().setName("Server listener")
         cur_thread = threading.current_thread().getName()
         print("{} hears (out of {}) from server {} : ".format(cur_thread, threading.active_count(), self.client_address))
-        print(data)
-        server_address = (self.client_address[0], self.client_address[1] -1)
-        print 'yoooo    ', server_address
-        boo = COUNTER.get()
-        COUNTER.set(boo-1)
-        print 'boo is ', boo
-        print 'The counter is ', COUNTER.get()
-        # count = 2
-        # while count:
-        #     ack = socket.recv(1024)
-        #     if 's1' in ack:
-        #         count = count -1
-        #     if 's2' in ack:
-        #         count = count -1
-        #     print 'ack receivedd from ', ack, '   count is ', count
+        print(data_by)
+        server_address = (self.client_address[0], self.client_address[1])
 
-        socket.sendto('ack from ' + THIS_SERVER, server_address)
+        response = [THIS_SERVER]
+        try:
+            # getting # [THIS_SERVER, self.client_address, jobNumber, data_by]
+            # forming # [SERVERname, (HOST,PORT), jobNumber]
+            if data_by[0] in SERVERS.keys():
+                response.append(data_by[1])
+                response.append(data_by[2])
+        except 'StandardError':
+            response.append(None)
+            response.append(None)
+        # response = 'ACK from '+THIS_SERVER
+        response_pickle = pickle.dumps(response)
+        socket.sendto(response_pickle, server_address)
+        print 'Just sent response to ', server_address
         # socket.sendto(data.upper(), self.client_address)
 
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer): 
