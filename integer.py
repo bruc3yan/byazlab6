@@ -7,6 +7,9 @@ class Integer(object):
 		self.last_modified = None #might not be needed
 		self.last_server = None #might not be needed
 
+	def set_owner(self, ownername):
+		self.owner = ownername
+
 	def set(self, value):
 		try:
 			new_value = int(value)

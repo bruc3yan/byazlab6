@@ -38,7 +38,8 @@ INDEX_SIZE = 8
 buf = BLOCK_SIZE - INDEX_SIZE
 
 data = "Hello world!"
-data_by = pickle.dumps(data) # serialize
+integer_create = ['Client','INTEGER', 'CREATE','helloWorld']
+data_by = pickle.dumps(integer_create) # serialize
 client_socket.sendto(data_by, address)
 
 # This is for setting up timeout

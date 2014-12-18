@@ -1,16 +1,9 @@
-# import socket
-# port = 5006
-# server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-# server_socket.bind(("", port))
-# print "waiting on port:", port
-# while 1:
-#     data, addr = server_socket.recvfrom(1024)
-#     print data
 import threading
 import time
 import SocketServer
 import sys
 from integer import Integer
+from simpledict import SimpleDict
 import os
 import signal
 try:
@@ -27,7 +20,9 @@ SERVERS["s2"] = ('localhost', 2000)
 NUM_SERVERS = 2
 
 # Dict of integers
-DATA_LIBRARY = {}
+DATA_LIB = {}
+
+TOTAL_ORDERING = Integer('server_order')
 
 COUNTER = Integer('meow')
 COUNTER.set(0)
@@ -37,7 +32,7 @@ THIS_SERVER = sys.argv[1]
 
 # The waiting queue for this server
 # the key is the HOST,PORT of the client
-# then it gives back an array: [jobNumber, remaining waiting servers]
+# then it gives back an array: [jobNumber, remaining waiting servers, actual commands]
 JOB_QUEUE = {}
 
 # locks
@@ -50,24 +45,28 @@ class ClientRequestHandler(SocketServer.BaseRequestHandler):
         threading.current_thread().setName("Client listener")
         cur_thread_name = threading.current_thread().getName()
         data_by = pickle.loads(data) # de-serialize
-        # data_by = data
         print("{} hears (out of {}) from {} : ".format(cur_thread_name, threading.active_count(), self.client_address))
         print(data_by)
 
         # if this is a ACK from the servers for previous requests
         client_port = self.client_address[1]
         if (client_port == 1000) or (client_port == 2000):
-            print "OOOOH ITS AN ALLYYY"
+            print "This is a response from server"
             # getting # [SERVERname, (HOST,PORT), jobNumber]
             try:
                 receivedServer = data_by[0]
                 receivedClient = data_by[1]
                 receivedJobnum = data_by[2]
+                receivedSuccess = data_by[3]
                 print JOB_QUEUE
                 value = JOB_QUEUE[receivedClient]
                 value[1] = value[1] -1
+                if not receivedSuccess:
+                    socket.sendto(pickle.dumps('Failed.'), receivedClient)
+                    del JOB_QUEUE[receivedClient]
                 if (value[1] == 0):
                     socket.sendto(pickle.dumps('Success.'), receivedClient)
+                    del JOB_QUEUE[receivedClient]
             except StandardError:
                 print '...'
 
@@ -77,33 +76,16 @@ class ClientRequestHandler(SocketServer.BaseRequestHandler):
             # [CLIENT, INTEGER, CREATE, ARG0]
             jobNumber = COUNTER.get()
             COUNTER.set(jobNumber+1)
-            newJob = [THIS_SERVER, self.client_address, jobNumber, data_by]
+            newJob = [THIS_SERVER, self.client_address, jobNumber, TOTAL_ORDERING.get(), data_by]
             newJob_pickled = pickle.dumps(newJob)
-            JOB_QUEUE[self.client_address] = [jobNumber, NUM_SERVERS]
+            JOB_QUEUE[self.client_address] = [jobNumber, NUM_SERVERS, data_by]
+
             print 'making new job : ', jobNumber
             print 'increased counter to be :    ', COUNTER.get()
             for server in SERVERS.keys():
                 HOST, PORT = SERVERS[server][0], SERVERS[server][1]
                 print 'HOST, PORT', (HOST, PORT)
                 socket.sendto(newJob_pickled, (HOST,PORT))
-
-
-        #socket.sendto(data.upper(), self.client_address)
-
-        # bruce's thingssss
-        # lock.acquire()
-        # try:
-        # 	print(data)
-        # finally:
-        # 	lock.release()
-        # for server in SERVERS.keys():
-        #     HOST, PORT = SERVERS[server][0], SERVERS[server][1]
-        #     print 'HOST, PORT', (HOST, PORT)
-        #     socket.sendto(data, (HOST,PORT))
-
-
-
-        # socket.sendto(data.upper(), self.client_address)
 
 
 
@@ -118,36 +100,58 @@ class ServerRequestHandler(SocketServer.BaseRequestHandler):
         print(data_by)
         server_address = (self.client_address[0], self.client_address[1])
 
+        # total ordering
+        order = data_by[-2]
+        print 'total order:     ', TOTAL_ORDERING.get()
+        if TOTAL_ORDERING.get() < order:
+            TOTAL_ORDERING.set(order)
+            print 'total order:     ', TOTAL_ORDERING.get()
+
+        success = 0
+        request = data_by[-1]
+        if 'CLIENT' in request[0].upper():
+            if 'INTEGER' in request[1].upper():
+                if 'CREATE' in request[2].upper():
+                    try:
+                        name = request[3]
+                        DATA_LIB[name] = Integer(name)
+                        DATA_LIB[name].set_owner(self.client_address)
+                        print 'DATA_LIB : ', DATA_LIB
+                        print 'Successfully create integer with name : ', name
+                        success  = 1
+                    except StandardError:
+                        print 'Failed to retrieve name to create Integer.'
+                        
+                if 'SET' in request[2].upper():
+                    try:
+                        name = request[3]
+                        new_value = request[4]
+                        DATA_LIB[name].set(new_value)
+                        print 'DATA_LIB : ', DATA_LIB
+                        print 'Successfully set integer with name ', name, ' to be ', DATA_LIB[name].get()
+                        success = 1
+                    except StandardError:
+                        print 'Failed to set value to integer.'
+                        
+
         response = [THIS_SERVER]
         try:
-            # getting # [THIS_SERVER, self.client_address, jobNumber, data_by]
-            # forming # [SERVERname, (HOST,PORT), jobNumber]
+            # getting # [THIS_SERVER, self.client_address, jobNumber,#totalOrdering, data_by]
+            # forming # [SERVERname, (HOST,PORT), jobNumber, success]
             if data_by[0] in SERVERS.keys():
                 response.append(data_by[1])
                 response.append(data_by[2])
+                response.append(success)
         except 'StandardError':
             response.append(None)
             response.append(None)
-        # response = 'ACK from '+THIS_SERVER
+            response.append(success)
         response_pickle = pickle.dumps(response)
         socket.sendto(response_pickle, server_address)
+        current_order = TOTAL_ORDERING.get()
+        TOTAL_ORDERING.set(current_order+1)
         print 'Just sent response to ', server_address
 
-        # bruce's things
-        # lock.acquire()
-        # try:
-        # 	print(data)
-        # finally:
-        # 	lock.release()
-        # server_address = (self.client_address[0], self.client_address[1] -1)
-        # print 'yoooo    ', server_address
-        # boo = COUNTER.get()
-        # COUNTER.set(boo-1)
-        # print 'boo is ', boo
-        # print 'The counter is ', COUNTER.get()
-
-        # socket.sendto('ack from ' + THIS_SERVER, server_address)
-        # socket.sendto(data.upper(), self.client_address)
 
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         pass
